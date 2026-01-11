@@ -127,21 +127,55 @@ function playLevelUpSound() {
     });
 }
 
-// Sound effect: Game over
+// Sound effect: Game over - SAD TROMBONE (wah wah wah waaaah)
 function playGameOverSound() {
     if (!audioCtx) return;
-    const notes = [392, 330, 262, 196];
-    notes.forEach((freq, i) => {
+
+    // Sad trombone notes: Bb, A, Ab, then long G with downward bend
+    const notes = [
+        { freq: 233, duration: 0.25, start: 0 },      // Bb
+        { freq: 220, duration: 0.25, start: 0.3 },    // A
+        { freq: 208, duration: 0.25, start: 0.6 },    // Ab
+        { freq: 196, duration: 1.2, start: 0.9, bend: true }  // G with sad bend down
+    ];
+
+    notes.forEach(note => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
+
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.type = 'sawtooth';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime + i * 0.2);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.2 + 0.25);
-        osc.start(audioCtx.currentTime + i * 0.2);
-        osc.stop(audioCtx.currentTime + i * 0.2 + 0.25);
+
+        const startTime = audioCtx.currentTime + note.start;
+
+        // Set frequency
+        osc.frequency.setValueAtTime(note.freq, startTime);
+
+        // Add vibrato for brass effect
+        const vibrato = audioCtx.createOscillator();
+        const vibratoGain = audioCtx.createGain();
+        vibrato.frequency.value = 5;
+        vibratoGain.gain.value = note.bend ? 8 : 3;
+        vibrato.connect(vibratoGain);
+        vibratoGain.connect(osc.frequency);
+        vibrato.start(startTime);
+        vibrato.stop(startTime + note.duration);
+
+        // Sad downward bend on last note
+        if (note.bend) {
+            osc.frequency.setValueAtTime(note.freq, startTime);
+            osc.frequency.exponentialRampToValueAtTime(note.freq * 0.7, startTime + note.duration);
+        }
+
+        // Volume envelope - brass attack
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.4, startTime + 0.05);
+        gain.gain.setValueAtTime(0.35, startTime + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.01, startTime + note.duration);
+
+        osc.start(startTime);
+        osc.stop(startTime + note.duration);
     });
 }
 
