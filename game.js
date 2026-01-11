@@ -229,6 +229,47 @@ let highScore = localStorage.getItem('spaceInvadersHighScore') || 0;
 let lives = 3;
 let level = 1;
 
+// Starfield for background
+const stars = [];
+const STAR_COUNT = 150;
+
+function createStars() {
+    for (let i = 0; i < STAR_COUNT; i++) {
+        stars.push({
+            x: Math.random() * CANVAS_WIDTH,
+            y: Math.random() * CANVAS_HEIGHT,
+            size: Math.random() * 2 + 0.5,
+            speed: Math.random() * 0.5 + 0.1,
+            brightness: Math.random()
+        });
+    }
+}
+
+function updateStars() {
+    stars.forEach(star => {
+        star.y += star.speed;
+        star.brightness += (Math.random() - 0.5) * 0.1;
+        star.brightness = Math.max(0.3, Math.min(1, star.brightness));
+        if (star.y > CANVAS_HEIGHT) {
+            star.y = 0;
+            star.x = Math.random() * CANVAS_WIDTH;
+        }
+    });
+}
+
+function drawStars() {
+    stars.forEach(star => {
+        const alpha = star.brightness;
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+// Initialize stars
+createStars();
+
 // Input tracking
 const keys = {
     left: false,
@@ -394,71 +435,236 @@ function createShields() {
     }
 }
 
-// Draw player ship
+// Draw player ship - 90s style with glow and detail
 function drawPlayer() {
     if (playerDead) return; // Don't draw if dead
 
+    const x = player.x;
+    const y = player.y;
+    const w = player.width;
+    const h = player.height;
+
+    // Engine glow
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#00ffff';
+    ctx.fillStyle = '#00ffff';
+    ctx.fillRect(x + w * 0.3, y + h - 2, w * 0.15, 6 + Math.random() * 4);
+    ctx.fillRect(x + w * 0.55, y + h - 2, w * 0.15, 6 + Math.random() * 4);
+
+    // Main body glow
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#33ff33';
+
+    // Main hull - darker base
+    ctx.fillStyle = '#1a8c1a';
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.5, y);
+    ctx.lineTo(x + w * 0.65, y + h * 0.3);
+    ctx.lineTo(x + w * 0.85, y + h * 0.5);
+    ctx.lineTo(x + w, y + h);
+    ctx.lineTo(x, y + h);
+    ctx.lineTo(x + w * 0.15, y + h * 0.5);
+    ctx.lineTo(x + w * 0.35, y + h * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Hull highlight
     ctx.fillStyle = '#33ff33';
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.5, y + 4);
+    ctx.lineTo(x + w * 0.6, y + h * 0.35);
+    ctx.lineTo(x + w * 0.7, y + h * 0.6);
+    ctx.lineTo(x + w * 0.5, y + h * 0.8);
+    ctx.lineTo(x + w * 0.3, y + h * 0.6);
+    ctx.lineTo(x + w * 0.4, y + h * 0.35);
+    ctx.closePath();
+    ctx.fill();
 
-    // Main body
-    ctx.fillRect(player.x, player.y + 10, player.width, player.height - 10);
+    // Cockpit
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#66ffff';
+    ctx.fillStyle = '#66ffff';
+    ctx.beginPath();
+    ctx.ellipse(x + w * 0.5, y + h * 0.45, w * 0.1, h * 0.15, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Cannon
-    ctx.fillRect(player.x + player.width / 2 - 3, player.y, 6, 15);
+    // Wing details
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#0f5c0f';
+    ctx.fillRect(x + 2, y + h * 0.7, w * 0.2, 4);
+    ctx.fillRect(x + w * 0.78, y + h * 0.7, w * 0.2, 4);
 
-    // Wings
-    ctx.fillRect(player.x - 5, player.y + player.height - 8, 10, 8);
-    ctx.fillRect(player.x + player.width - 5, player.y + player.height - 8, 10, 8);
+    // Cannon tip glow
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#ffff00';
+    ctx.fillStyle = '#ffff00';
+    ctx.fillRect(x + w * 0.47, y - 2, w * 0.06, 4);
+
+    ctx.shadowBlur = 0;
 }
 
-// Draw aliens
+// Animation frame counter for aliens
+let alienAnimFrame = 0;
+setInterval(() => { alienAnimFrame = (alienAnimFrame + 1) % 2; }, 500);
+
+// Draw aliens - 90s style with animation and glow
 function drawAliens() {
     aliens.forEach(alien => {
         if (!alien.alive) return;
 
-        // Different colors based on row
-        if (alien.row === 0) {
-            ctx.fillStyle = '#ff3333'; // Top row - red
-        } else if (alien.row < 3) {
-            ctx.fillStyle = '#ffff33'; // Middle rows - yellow
-        } else {
-            ctx.fillStyle = '#33ffff'; // Bottom rows - cyan
-        }
-
-        // Draw alien body
         const x = alien.x;
         const y = alien.y;
         const w = alien.width;
         const h = alien.height;
 
-        // Body
-        ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.6, h * 0.5);
+        let mainColor, darkColor, glowColor;
 
-        // Head
-        ctx.fillRect(x + w * 0.3, y, w * 0.4, h * 0.3);
-
-        // Eyes
-        ctx.fillStyle = '#000';
-        ctx.fillRect(x + w * 0.35, y + h * 0.1, w * 0.1, h * 0.1);
-        ctx.fillRect(x + w * 0.55, y + h * 0.1, w * 0.1, h * 0.1);
-
-        // Tentacles
+        // Different colors based on row
         if (alien.row === 0) {
-            ctx.fillStyle = '#ff3333';
+            mainColor = '#ff3333';
+            darkColor = '#aa0000';
+            glowColor = '#ff6666';
         } else if (alien.row < 3) {
-            ctx.fillStyle = '#ffff33';
+            mainColor = '#ffff33';
+            darkColor = '#aaaa00';
+            glowColor = '#ffff88';
         } else {
-            ctx.fillStyle = '#33ffff';
+            mainColor = '#33ffff';
+            darkColor = '#00aaaa';
+            glowColor = '#88ffff';
         }
-        ctx.fillRect(x, y + h * 0.5, w * 0.2, h * 0.3);
-        ctx.fillRect(x + w * 0.8, y + h * 0.5, w * 0.2, h * 0.3);
-        ctx.fillRect(x + w * 0.1, y + h * 0.7, w * 0.15, h * 0.3);
-        ctx.fillRect(x + w * 0.75, y + h * 0.7, w * 0.15, h * 0.3);
+
+        // Glow effect
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = glowColor;
+
+        if (alien.row === 0) {
+            // Top row - squid type
+            ctx.fillStyle = darkColor;
+            ctx.beginPath();
+            ctx.ellipse(x + w * 0.5, y + h * 0.35, w * 0.35, h * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = mainColor;
+            ctx.beginPath();
+            ctx.ellipse(x + w * 0.5, y + h * 0.3, w * 0.25, h * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tentacles animated
+            const tentacleOffset = alienAnimFrame === 0 ? 0 : h * 0.08;
+            ctx.fillStyle = mainColor;
+            ctx.fillRect(x + w * 0.15, y + h * 0.5 + tentacleOffset, w * 0.12, h * 0.4 - tentacleOffset);
+            ctx.fillRect(x + w * 0.35, y + h * 0.55, w * 0.1, h * 0.4);
+            ctx.fillRect(x + w * 0.55, y + h * 0.55, w * 0.1, h * 0.4);
+            ctx.fillRect(x + w * 0.73, y + h * 0.5 - tentacleOffset, w * 0.12, h * 0.4 + tentacleOffset);
+
+            // Eyes
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(x + w * 0.38, y + h * 0.28, w * 0.08, h * 0.1, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(x + w * 0.62, y + h * 0.28, w * 0.08, h * 0.1, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(x + w * 0.38, y + h * 0.28, w * 0.04, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + w * 0.62, y + h * 0.28, w * 0.04, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (alien.row < 3) {
+            // Middle rows - crab type
+            ctx.fillStyle = darkColor;
+            ctx.fillRect(x + w * 0.2, y + h * 0.15, w * 0.6, h * 0.5);
+
+            ctx.fillStyle = mainColor;
+            ctx.fillRect(x + w * 0.25, y + h * 0.2, w * 0.5, h * 0.35);
+
+            // Claws animated
+            const clawAngle = alienAnimFrame === 0 ? 0.2 : -0.2;
+            ctx.save();
+            ctx.translate(x + w * 0.15, y + h * 0.4);
+            ctx.rotate(clawAngle);
+            ctx.fillRect(-w * 0.15, -h * 0.1, w * 0.2, h * 0.2);
+            ctx.restore();
+            ctx.save();
+            ctx.translate(x + w * 0.85, y + h * 0.4);
+            ctx.rotate(-clawAngle);
+            ctx.fillRect(-w * 0.05, -h * 0.1, w * 0.2, h * 0.2);
+            ctx.restore();
+
+            // Legs
+            ctx.fillRect(x + w * 0.25, y + h * 0.6, w * 0.12, h * 0.35);
+            ctx.fillRect(x + w * 0.44, y + h * 0.65, w * 0.12, h * 0.3);
+            ctx.fillRect(x + w * 0.63, y + h * 0.6, w * 0.12, h * 0.35);
+
+            // Eyes
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(x + w * 0.32, y + h * 0.25, w * 0.12, h * 0.15);
+            ctx.fillRect(x + w * 0.56, y + h * 0.25, w * 0.12, h * 0.15);
+            ctx.fillStyle = '#000';
+            ctx.shadowBlur = 0;
+            ctx.fillRect(x + w * 0.35, y + h * 0.28, w * 0.06, h * 0.09);
+            ctx.fillRect(x + w * 0.59, y + h * 0.28, w * 0.06, h * 0.09);
+        } else {
+            // Bottom rows - octopus type
+            ctx.fillStyle = darkColor;
+            ctx.beginPath();
+            ctx.arc(x + w * 0.5, y + h * 0.4, w * 0.4, 0, Math.PI, true);
+            ctx.fill();
+
+            ctx.fillStyle = mainColor;
+            ctx.beginPath();
+            ctx.arc(x + w * 0.5, y + h * 0.35, w * 0.32, 0, Math.PI, true);
+            ctx.fill();
+
+            // Dome top
+            ctx.beginPath();
+            ctx.ellipse(x + w * 0.5, y + h * 0.25, w * 0.28, h * 0.2, 0, Math.PI, Math.PI * 2);
+            ctx.fill();
+
+            // Tentacles animated wave
+            const wave = alienAnimFrame === 0 ? 1 : -1;
+            for (let i = 0; i < 4; i++) {
+                const tx = x + w * (0.2 + i * 0.2);
+                const offset = (i % 2 === 0 ? wave : -wave) * h * 0.05;
+                ctx.fillRect(tx, y + h * 0.5 + offset, w * 0.1, h * 0.45);
+            }
+
+            // Eyes
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.35, y + h * 0.3, w * 0.1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + w * 0.65, y + h * 0.3, w * 0.1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(x + w * 0.35, y + h * 0.32, w * 0.05, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + w * 0.65, y + h * 0.32, w * 0.05, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.shadowBlur = 0;
     });
 }
 
-// Draw shields
+// Draw shields with glow
 function drawShields() {
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#33ff33';
     ctx.fillStyle = '#33ff33';
     shields.forEach(shield => {
         shield.pixels.forEach(pixel => {
@@ -467,27 +673,42 @@ function drawShields() {
             }
         });
     });
+    ctx.shadowBlur = 0;
 }
 
-// Draw bullets
+// Draw bullets with glow effects
 function drawBullets() {
-    // Player bullets
-    ctx.fillStyle = '#ffffff';
+    // Player bullets - bright cyan/white laser
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#00ffff';
     playerBullets.forEach(bullet => {
+        // Outer glow
+        ctx.fillStyle = '#00ffff';
+        ctx.fillRect(bullet.x - 1, bullet.y, BULLET_WIDTH + 2, BULLET_HEIGHT);
+        // Inner bright core
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(bullet.x, bullet.y, BULLET_WIDTH, BULLET_HEIGHT);
     });
 
-    // Alien bullets
-    ctx.fillStyle = '#ff6666';
+    // Alien bullets - menacing red/orange
+    ctx.shadowColor = '#ff3300';
     alienBullets.forEach(bullet => {
+        // Outer glow
+        ctx.fillStyle = '#ff3300';
+        ctx.fillRect(bullet.x - 1, bullet.y, BULLET_WIDTH + 2, BULLET_HEIGHT);
+        // Inner core
+        ctx.fillStyle = '#ffff00';
         ctx.fillRect(bullet.x, bullet.y, BULLET_WIDTH, BULLET_HEIGHT);
     });
+    ctx.shadowBlur = 0;
 }
 
-// Draw UI
+// Draw UI with glow
 function drawUI() {
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#33ff33';
     ctx.fillStyle = '#33ff33';
-    ctx.font = '20px Courier New';
+    ctx.font = 'bold 20px Courier New';
     ctx.textAlign = 'left';
     ctx.fillText(`SCORE: ${score}`, 20, 30);
     ctx.fillText(`HIGH: ${highScore}`, 20, 55);
@@ -496,55 +717,98 @@ function drawUI() {
     ctx.fillText(`LIVES: ${lives}`, CANVAS_WIDTH - 20, 30);
     ctx.fillText(`LEVEL: ${level}`, CANVAS_WIDTH - 20, 55);
 
-    // Draw lives as ships
+    // Draw lives as mini ships with glow
+    ctx.shadowBlur = 6;
     for (let i = 0; i < lives - 1; i++) {
         const lx = CANVAS_WIDTH - 100 - i * 35;
-        ctx.fillRect(lx, 40, 25, 10);
-        ctx.fillRect(lx + 10, 35, 5, 8);
+        ctx.beginPath();
+        ctx.moveTo(lx + 12, 35);
+        ctx.lineTo(lx + 20, 45);
+        ctx.lineTo(lx + 25, 55);
+        ctx.lineTo(lx, 55);
+        ctx.lineTo(lx + 5, 45);
+        ctx.closePath();
+        ctx.fill();
     }
+    ctx.shadowBlur = 0;
 }
 
-// Draw start screen
+// Draw start screen with 90s style
 function drawStartScreen() {
+    // Title with heavy glow
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = '#33ff33';
     ctx.fillStyle = '#33ff33';
-    ctx.font = '48px Courier New';
+    ctx.font = 'bold 52px Courier New';
     ctx.textAlign = 'center';
     ctx.fillText('SPACE INVADERS', CANVAS_WIDTH / 2, 200);
 
-    ctx.font = '24px Courier New';
+    // Subtitle
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#00ffff';
+    ctx.fillStyle = '#00ffff';
+    ctx.font = 'bold 24px Courier New';
     ctx.fillText('Press ENTER to Start', CANVAS_WIDTH / 2, 300);
 
+    // Pulsing effect on start text
+    const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+    ctx.globalAlpha = pulse;
+    ctx.fillText('Press ENTER to Start', CANVAS_WIDTH / 2, 300);
+    ctx.globalAlpha = 1;
+
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#ffffff';
     ctx.font = '18px Courier New';
     ctx.fillStyle = '#ffffff';
     ctx.fillText('Controls:', CANVAS_WIDTH / 2, 380);
     ctx.fillText('← → Arrow Keys to Move', CANVAS_WIDTH / 2, 410);
     ctx.fillText('SPACE to Shoot', CANVAS_WIDTH / 2, 440);
 
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = '#ffff33';
     ctx.fillStyle = '#ffff33';
     ctx.fillText(`High Score: ${highScore}`, CANVAS_WIDTH / 2, 500);
+    ctx.shadowBlur = 0;
 }
 
-// Draw game over screen
+// Draw game over screen with 90s style
 function drawGameOver() {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+    // Game over text with red glow
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = '#ff0000';
     ctx.fillStyle = '#ff3333';
-    ctx.font = '48px Courier New';
+    ctx.font = 'bold 52px Courier New';
     ctx.textAlign = 'center';
     ctx.fillText('GAME OVER', CANVAS_WIDTH / 2, 250);
 
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ffffff';
     ctx.fillStyle = '#ffffff';
     ctx.font = '24px Courier New';
     ctx.fillText(`Final Score: ${score}`, CANVAS_WIDTH / 2, 320);
 
     if (score >= highScore) {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#ffff00';
         ctx.fillStyle = '#ffff33';
-        ctx.fillText('NEW HIGH SCORE!', CANVAS_WIDTH / 2, 360);
+        ctx.font = 'bold 28px Courier New';
+        ctx.fillText('★ NEW HIGH SCORE! ★', CANVAS_WIDTH / 2, 365);
     }
 
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = '#33ff33';
     ctx.fillStyle = '#33ff33';
+    ctx.font = '24px Courier New';
+
+    // Pulsing restart text
+    const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+    ctx.globalAlpha = pulse;
     ctx.fillText('Press ENTER to Restart', CANVAS_WIDTH / 2, 420);
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
 }
 
 // Update player
@@ -834,11 +1098,36 @@ function resetGame() {
     startMusic();
 }
 
+// CRT scanline effect overlay
+function drawScanlines() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    for (let y = 0; y < CANVAS_HEIGHT; y += 4) {
+        ctx.fillRect(0, y, CANVAS_WIDTH, 2);
+    }
+
+    // Vignette effect - darker corners
+    const gradient = ctx.createRadialGradient(
+        CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_HEIGHT * 0.4,
+        CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, CANVAS_HEIGHT * 0.8
+    );
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+}
+
 // Main game loop
 function gameLoop() {
-    // Clear canvas
-    ctx.fillStyle = '#000';
+    // Clear canvas with dark blue gradient for space feel
+    const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    gradient.addColorStop(0, '#000011');
+    gradient.addColorStop(1, '#000000');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Always update and draw stars
+    updateStars();
+    drawStars();
 
     if (gameState === 'start') {
         drawStartScreen();
@@ -866,6 +1155,9 @@ function gameLoop() {
         drawUI();
         drawGameOver();
     }
+
+    // Draw CRT scanline effect
+    drawScanlines();
 
     requestAnimationFrame(gameLoop);
 }
