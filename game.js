@@ -109,7 +109,7 @@ function playPlayerExplosionSound() {
     }
 }
 
-// Sound effect: Level up
+// Sound effect: Level up (short)
 function playLevelUpSound() {
     if (!audioCtx) return;
     const notes = [523, 659, 784, 1047];
@@ -124,6 +124,75 @@ function playLevelUpSound() {
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.15);
         osc.start(audioCtx.currentTime + i * 0.1);
         osc.stop(audioCtx.currentTime + i * 0.1 + 0.15);
+    });
+}
+
+// Sound effect: Victory fanfare for level complete
+function playVictoryFanfare() {
+    if (!audioCtx) return;
+
+    // Triumphant ascending arpeggio with harmony
+    const melody = [
+        { freq: 523, time: 0, duration: 0.15 },      // C5
+        { freq: 659, time: 0.12, duration: 0.15 },   // E5
+        { freq: 784, time: 0.24, duration: 0.15 },   // G5
+        { freq: 1047, time: 0.36, duration: 0.4 },   // C6 (hold)
+        { freq: 1175, time: 0.5, duration: 0.15 },   // D6
+        { freq: 1319, time: 0.62, duration: 0.15 },  // E6
+        { freq: 1568, time: 0.74, duration: 0.5 },   // G6 (finale)
+    ];
+
+    // Harmony notes
+    const harmony = [
+        { freq: 392, time: 0, duration: 0.3 },       // G4
+        { freq: 523, time: 0.36, duration: 0.4 },    // C5
+        { freq: 784, time: 0.74, duration: 0.5 },    // G5
+    ];
+
+    // Play melody
+    melody.forEach(note => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'square';
+        osc.frequency.value = note.freq;
+        gain.gain.setValueAtTime(0, audioCtx.currentTime + note.time);
+        gain.gain.linearRampToValueAtTime(0.25, audioCtx.currentTime + note.time + 0.02);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime + note.time + note.duration * 0.7);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + note.time + note.duration);
+        osc.start(audioCtx.currentTime + note.time);
+        osc.stop(audioCtx.currentTime + note.time + note.duration);
+    });
+
+    // Play harmony (softer)
+    harmony.forEach(note => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.value = note.freq;
+        gain.gain.setValueAtTime(0, audioCtx.currentTime + note.time);
+        gain.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + note.time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + note.time + note.duration);
+        osc.start(audioCtx.currentTime + note.time);
+        osc.stop(audioCtx.currentTime + note.time + note.duration);
+    });
+
+    // Bass drum hits
+    [0, 0.36, 0.74].forEach(time => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime + time);
+        osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + time + 0.1);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime + time);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + time + 0.15);
+        osc.start(audioCtx.currentTime + time);
+        osc.stop(audioCtx.currentTime + time + 0.15);
     });
 }
 
@@ -257,7 +326,7 @@ const ALIEN_START_Y = 80;
 const SHIELD_COUNT = 4;
 
 // Game state
-let gameState = 'start'; // 'start', 'playing', 'gameover'
+let gameState = 'start'; // 'start', 'playing', 'levelcomplete', 'gameover'
 let score = 0;
 let highScore = localStorage.getItem('spaceInvadersHighScore') || 0;
 let lives = 3;
@@ -341,6 +410,11 @@ let alienShootTimer = 0;
 // Screen shake
 let screenShake = 0;
 let flashAlpha = 0;
+
+// Level complete state
+let levelCompleteTimer = 0;
+const LEVEL_COMPLETE_DURATION = 180; // 3 seconds at 60fps
+let levelCompleteParticles = [];
 
 // Create player explosion - SPECTACULAR!
 function createPlayerExplosion(x, y) {
@@ -522,6 +596,185 @@ function drawFlash() {
     if (flashAlpha > 0.01) {
         ctx.fillStyle = `rgba(255, 255, 200, ${flashAlpha * 0.7})`;
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
+}
+
+// Level complete celebration effects
+function startLevelComplete() {
+    gameState = 'levelcomplete';
+    levelCompleteTimer = LEVEL_COMPLETE_DURATION;
+    levelCompleteParticles = [];
+    flashAlpha = 0.8;
+    screenShake = 10;
+    stopMusic();
+    playVictoryFanfare();
+
+    // Create celebratory firework particles
+    createFireworks();
+}
+
+function createFireworks() {
+    // Multiple firework bursts across the screen
+    const burstPoints = [
+        { x: CANVAS_WIDTH * 0.2, y: CANVAS_HEIGHT * 0.3 },
+        { x: CANVAS_WIDTH * 0.5, y: CANVAS_HEIGHT * 0.25 },
+        { x: CANVAS_WIDTH * 0.8, y: CANVAS_HEIGHT * 0.3 },
+        { x: CANVAS_WIDTH * 0.35, y: CANVAS_HEIGHT * 0.45 },
+        { x: CANVAS_WIDTH * 0.65, y: CANVAS_HEIGHT * 0.45 },
+    ];
+
+    const colors = ['#ffff00', '#ff00ff', '#00ffff', '#ff8800', '#88ff00', '#ff0088', '#00ff88'];
+
+    burstPoints.forEach((point, index) => {
+        // Delay each burst
+        setTimeout(() => {
+            const color = colors[index % colors.length];
+            // Create burst particles
+            for (let i = 0; i < 30; i++) {
+                const angle = (Math.PI * 2 * i) / 30;
+                const speed = 3 + Math.random() * 4;
+                levelCompleteParticles.push({
+                    x: point.x,
+                    y: point.y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 60 + Math.random() * 40,
+                    maxLife: 100,
+                    size: 3 + Math.random() * 3,
+                    color: color,
+                    type: 'firework'
+                });
+            }
+            // Inner brighter burst
+            for (let i = 0; i < 15; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 1 + Math.random() * 2;
+                levelCompleteParticles.push({
+                    x: point.x,
+                    y: point.y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 40 + Math.random() * 30,
+                    maxLife: 70,
+                    size: 4 + Math.random() * 4,
+                    color: '#ffffff',
+                    type: 'firework'
+                });
+            }
+        }, index * 150);
+    });
+}
+
+function updateLevelComplete() {
+    levelCompleteTimer--;
+
+    // Spawn additional fireworks periodically
+    if (levelCompleteTimer > 60 && levelCompleteTimer % 30 === 0) {
+        const x = Math.random() * CANVAS_WIDTH * 0.6 + CANVAS_WIDTH * 0.2;
+        const y = Math.random() * CANVAS_HEIGHT * 0.3 + CANVAS_HEIGHT * 0.2;
+        const colors = ['#ffff00', '#ff00ff', '#00ffff', '#ff8800', '#88ff00'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
+
+        for (let i = 0; i < 20; i++) {
+            const angle = (Math.PI * 2 * i) / 20;
+            const speed = 2 + Math.random() * 3;
+            levelCompleteParticles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 50 + Math.random() * 30,
+                maxLife: 80,
+                size: 2 + Math.random() * 3,
+                color: color,
+                type: 'firework'
+            });
+        }
+    }
+
+    // Update particles
+    levelCompleteParticles = levelCompleteParticles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.05; // gravity
+        p.vx *= 0.99; // drag
+        p.life--;
+        return p.life > 0;
+    });
+
+    // Transition to next level
+    if (levelCompleteTimer <= 0) {
+        level++;
+        alienSpeed = 1 + level * 0.5;
+        createAliens();
+        createShields();
+        levelCompleteParticles = [];
+        gameState = 'playing';
+        startMusic();
+    }
+}
+
+function drawLevelComplete() {
+    // Draw particles
+    levelCompleteParticles.forEach(p => {
+        const alpha = p.life / p.maxLife;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+
+        // Sparkle effect
+        const flicker = 0.7 + Math.random() * 0.3;
+        const size = p.size * alpha * flicker;
+        ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+
+        // Trail
+        ctx.globalAlpha = alpha * 0.3;
+        ctx.fillRect(p.x - p.vx * 2 - size / 4, p.y - p.vy * 2 - size / 4, size / 2, size / 2);
+    });
+    ctx.globalAlpha = 1;
+
+    // Pulsing background overlay
+    const pulse = Math.sin(levelCompleteTimer * 0.1) * 0.1 + 0.15;
+    ctx.fillStyle = `rgba(100, 255, 100, ${pulse})`;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // "LEVEL COMPLETE" text with effects
+    ctx.textAlign = 'center';
+
+    // Glow effect
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#88ff88';
+
+    // Main text
+    ctx.font = 'bold 48px Courier New';
+    const bounce = Math.sin(levelCompleteTimer * 0.15) * 5;
+
+    // Shadow
+    ctx.fillStyle = '#224422';
+    ctx.fillText('LEVEL COMPLETE!', CANVAS_WIDTH / 2 + 3, CANVAS_HEIGHT / 2 - 30 + bounce + 3);
+
+    // Main text with gradient simulation
+    ctx.fillStyle = '#88ff88';
+    ctx.fillText('LEVEL COMPLETE!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 30 + bounce);
+
+    // Highlight
+    ctx.fillStyle = '#aaffaa';
+    ctx.fillText('LEVEL COMPLETE!', CANVAS_WIDTH / 2 - 1, CANVAS_HEIGHT / 2 - 31 + bounce);
+
+    ctx.shadowBlur = 0;
+
+    // Level number
+    ctx.font = 'bold 32px Courier New';
+    ctx.fillStyle = '#ffcc44';
+    ctx.fillText(`LEVEL ${level} CLEARED`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
+
+    // Next level preview
+    if (levelCompleteTimer < 90) {
+        const fadeIn = 1 - (levelCompleteTimer / 90);
+        ctx.globalAlpha = fadeIn;
+        ctx.font = '24px Courier New';
+        ctx.fillStyle = '#aaaaff';
+        ctx.fillText(`GET READY FOR LEVEL ${level + 1}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
+        ctx.globalAlpha = 1;
     }
 }
 
@@ -924,12 +1177,8 @@ function updatePlayer() {
 // Update aliens
 function updateAliens() {
     if (aliens.filter(a => a.alive).length === 0) {
-        // Level complete
-        level++;
-        alienSpeed = 1 + level * 0.5;
-        createAliens();
-        createShields();
-        playLevelUpSound();
+        // Level complete - start celebration
+        startLevelComplete();
         return;
     }
 
@@ -1160,8 +1409,10 @@ function resetGame() {
     playerBullets = [];
     alienBullets = [];
     explosionParticles = [];
+    levelCompleteParticles = [];
     playerDead = false;
     respawnTimer = 0;
+    levelCompleteTimer = 0;
 
     createAliens();
     createShields();
@@ -1229,6 +1480,16 @@ function gameLoop() {
         drawBullets();
         drawExplosionParticles();
         drawFlash();
+        drawUI();
+    } else if (gameState === 'levelcomplete') {
+        updateLevelComplete();
+        updateExplosionParticles();
+
+        drawShields();
+        drawPlayer();
+        drawExplosionParticles();
+        drawFlash();
+        drawLevelComplete();
         drawUI();
     } else if (gameState === 'gameover') {
         updateExplosionParticles();
